@@ -1,0 +1,110 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+
+#ifndef APSSID
+#define APSSID "ESP8266"
+#define APPSK  ""
+#endif
+
+LiquidCrystal_I2C lcd(0X3F, 16, 2);
+
+ESP8266WebServer server(80);
+
+const char *ssid = APSSID;
+const char *password = APPSK;
+String situaC;
+String situaR;
+String page = "";
+IPAddress myIP;
+int i = 0, z = 0;
+
+void setup() {
+
+  lcd.init();
+  lcd.backlight();
+  pinMode(0, OUTPUT);
+  pinMode(2, INPUT);
+  Serial.begin(115200);
+
+  WiFi.softAP(ssid, password);
+
+  myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  server.on("/", []() {
+    server.send(200, "text/html", page);
+  });
+  lcd.setCursor(0, 0);
+  lcd.print("Rede: " + String(APSSID));
+  lcd.setCursor(0, 1);
+  lcd.print("IP: ");
+  lcd.print(myIP);
+  digitalWrite(0, HIGH);
+  delay(1000);
+
+  server.begin();
+  Serial.println("Web server Inicializado!");
+}
+
+void loop() {
+  server.handleClient();
+  situaC = "Sem Continuidade";
+  situaR = "Resist.: Nenhuma";
+  float pot = analogRead(A0);
+  pot = map(pot, 0, 1023, 0, 33);
+  if ( pot / 10 > 0 )//
+  {
+    z = 1;
+  }
+  if (z == 1)
+  {
+    lcd.setCursor(0, 0);
+    if ( pot / 10 > 0 )//
+    {
+      digitalWrite(0, LOW);
+      tone(2, 1500);
+      lcd.print("Com Continuidade");
+      situaC = "<font color=\"green\">Com Continuidade</font>";
+    }
+    else
+    {
+      digitalWrite(0, HIGH);
+      noTone(2);
+      lcd.print("Sem Continuidade");
+      situaC = "<font color=\"#ff0000\">Sem Continuidade</font>";
+    }
+    lcd.setCursor(0, 1);
+    if ( pot / 10 > 2)
+    {
+      lcd.print("Resist.: Baixa  ");
+      situaR = "<font color=\"green\">Resist&ecircncia Baixa</font>";
+    }
+    else if (pot / 10 > 0)//
+    {
+      if (i == 0)
+      {
+        lcd.print("Resist.: Alta   ");
+        situaR = "<font color=\"#ff0000\">Resist&ecircncia Alta</font>";
+        i = 1;
+      }
+      else
+      {
+        lcd.clear();
+        i = 0;
+      }
+    }
+    else
+    {
+      lcd.print("Resist.: Nenhuma");
+      situaR = "Nenhuma";
+    }
+  }
+  page = "<br><center><font size=+4><b>Web Server da Giga de Teste</b></font></center><br>";
+  page += "<p><center><font size=+3><b>Continuidade: </b>" + String(situaC); "</font></center></p>";
+  page += "<center><font size=+3><b>Resist&ecircncia: </b>" + String(situaR); "</font></center><br>";
+  page += "<meta http-equiv='refresh' content='1'>";
+  delay(200);
+}
